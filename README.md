@@ -1,5 +1,5 @@
 # TetrapolarMotorDriver
-> This project is a driver for a bldc stepper frankenstein motor with 4 poles. Its based on a Atmega328p and it can also control temperature.
+> This project is a driver for a bldc stepper frankenstein motor with 4 poles. Its based on a Atmega328p and it can also control two digital inputs and two extra outputs.
 > The project was made to retrofit a outdated lab equipment.
 
 ## Specs:
