@@ -5,6 +5,15 @@
 * rev:    2.1                                      *
 ****************************************************/
 
+#define DEBUG 0
+#if DEBUG == 1
+#define debug(x) Serial.print(x)
+#define debugln(x) Serial.println(x)
+#else
+#define debug(x)
+#define debugln(x)
+#endif
+
 // GPIO's
 #define CTemp A1    // analog value k to the temp of the coil
 #define SPspeed A0  // analog value k to the Set point for the speed
@@ -28,6 +37,8 @@
 #define C4 5
 
 
+
+
 // System Var's
 const unsigned long OnDelayPulse = 1500000; //us to wait pulsed to start the secuence
 const int MaxDty = 90;  // duty cicle based on the coil PWM, in 0-254*Vin
@@ -49,22 +60,22 @@ bool PowerState(){  ////// <-----------------------------------------falla
     }
     Tf=millis();
     aux=Tf-Ti;
-    Serial.print("MP detected, Elapsed time: ");
-    Serial.println(aux);
+    debug("MP detected, Elapsed time: ");
+    debugln(aux);
     if(aux>OnDelayPulse){
-      Serial.println("---CHANGE IN POWER STATE---");
+      debugln("---CHANGE IN POWER STATE---");
       ON=!ON;
       return ON;
       
     }
    }
-   Serial.println("---NO CHANGE IN POWER STATE---");
+   debugln("---NO CHANGE IN POWER STATE---");
    return ON;
 }
 
 // --- Activates the coils C1, C2, C3, C4
 void step1(){
-    Serial.println("Activating coil num 1");
+    debugln("Activating coil num 1");
     while(!digitalRead(ind1) && !digitalRead(ind2)&& !digitalRead(ind3)){
       analogWrite(C1, Dty);
     }
@@ -76,7 +87,7 @@ int Astep1(){
   /*
    * returns the time it took per 1 rev
    */
-   Serial.print("Activating coil num 1 w/ time control, pulse time: ");
+   debug("Activating coil num 1 w/ time control, pulse time: ");
     Ti=millis();
     while(!digitalRead(ind1) && !digitalRead(ind2)&& !digitalRead(ind3)){
       analogWrite(C1, Dty);
@@ -84,13 +95,13 @@ int Astep1(){
     
     digitalWrite(C1, LOW);
     Tf=millis();
-    Serial.println(Tf-Ti);
+    debugln(Tf-Ti);
     CheckStatus();
     return int(Tf-Ti);
 }
 
 void step2(){
-  Serial.println("Activating coil num 2");
+  debugln("Activating coil num 2");
     while(digitalRead(ind1) && !digitalRead(ind2)&& !digitalRead(ind3)){
       analogWrite(C2, Dty);
     }
@@ -98,7 +109,7 @@ void step2(){
     CheckStatus();
 }
 void step3(){
-  Serial.println("Activating coil num 3");
+  debugln("Activating coil num 3");
     while(digitalRead(ind1) && digitalRead(ind2)&& !digitalRead(ind3)){
       analogWrite(C3, Dty);
     }
@@ -106,7 +117,7 @@ void step3(){
     CheckStatus();
 }
 void step4(){
-  Serial.println("Activating coil num 4");
+  debugln("Activating coil num 4");
     while(digitalRead(ind1) && digitalRead(ind2)&& digitalRead(ind3)){
       analogWrite(C4, Dty);
     }
@@ -118,7 +129,7 @@ void step4(){
 
 void HeaterEnable(){
   if(!digitalRead(WaterLevel) && !HeaterState){
-    Serial.println("Waterlevel OK, ---ACTIVATING HEATER RELAY---");
+    debugln("Waterlevel OK, ---ACTIVATING HEATER RELAY---");
     HeaterState=true;
     digitalWrite(Heater, HIGH);
     }
@@ -132,8 +143,8 @@ int SetSpeed(){
   OUTPUT INT
   */
   int SPd = speeds[map(analogRead(SPspeed), 0, 1023, 0, 9)];
-  Serial.print("Speed readed, SetSpeed: ");
-  Serial.println(SPd);
+  debug("Speed readed, SetSpeed: ");
+  debugln(SPd);
   return SPd;
 }
 
@@ -147,27 +158,27 @@ int CheckPosition(){
   bool I2 = digitalRead(ind2);
   bool I3 = digitalRead(ind3);
   
-  Serial.print("Checking position, IND1, IND2, IND3: ");
-  Serial.print(I1);
-  Serial.print(I2);
-  Serial.println(I3);
-  Serial.print("Facing Coil num: ");
+  debug("Checking position, IND1, IND2, IND3: ");
+  debug(I1);
+  debug(I2);
+  debugln(I3);
+  debug("Facing Coil num: ");
   
   
   if(!I1 && !I2 && !I3){
-    Serial.println(1);
+    debugln(1);
     return 1;
   }
   else if(I1 && !I2 && !I3){
-    Serial.println(2);
+    debugln(2);
     return 2;
   }
   else if(I1 && I2 && !I3){
-    Serial.println(3);
+    debugln(3);
     return 3;
   }
   else{
-    Serial.println(4);
+    debugln(4);
     return 4;
   }
 }
@@ -180,17 +191,17 @@ void CheckTemp(){
   // --- NOTE ---
   // for PTC change the sign of the operator
   if(analogRead(CTemp)>Tmax){
-    Serial.println("### TEMP ERR ###");
+    debugln("### TEMP ERR ###");
     err1();
   }
-  Serial.println("-- TEMP OK --");
+  debugln("-- TEMP OK --");
 }
 
 void err1(){
   /*
   overheated coil error
   */
-  Serial.println("### ENTERING ERROR1 MODE ###");
+  debugln("### ENTERING ERROR1 MODE ###");
   digitalWrite(C1, LOW);
   digitalWrite(C2, LOW);
   digitalWrite(C3, LOW);
@@ -213,7 +224,7 @@ void err2(){
   /*
   rotor problem
   */
-  Serial.println("### ENTERING ERROR2 MODE ###");
+  debugln("### ENTERING ERROR2 MODE ###");
   digitalWrite(C1, LOW);
   digitalWrite(C2, LOW);
   digitalWrite(C3, LOW);
@@ -237,29 +248,29 @@ void GoToStart(){
   /*
   goes to a known position to start in a known direction
   */
-  Serial.println("--- GOING TO START POSITION ---");
+  debugln("--- GOING TO START POSITION ---");
   digitalWrite(SoftStart, HIGH);
   switch (CheckPosition()){
 
     case 1:
-      Serial.println(">Case1");
+      debugln(">Case1");
       step1();
       break; 
     case 2:
-      Serial.println(">Case2");
+      debugln(">Case2");
       step2();
       step3();
       step4();
       step1(); 
       break;
     case 3:
-      Serial.println(">Case3");
+      debugln(">Case3");
       step3();
       step4();
       step1();
       break;
     case 4:
-      Serial.println(">Case4");
+      debugln(">Case4");
       step4();
       step1();
       break;
@@ -270,24 +281,24 @@ void GoToStart(){
 
 
 int GetDty(int Pv){
-  Serial.println("--- SPEED P Control ---");
+  debugln("--- SPEED P Control ---");
   if(Pv>MaxSpeed){
-    Serial.println("#### OVERSPEED DETECTED ####");   
+    debugln("#### OVERSPEED DETECTED ####");   
     err2();
   }
   int E, Sp=SetSpeed();
   
   E=int((Sp-Pv)*(Kp/100));
-  Serial.print("> Calculated Duty cicle: ");
-  Serial.println(E);
+  debug("> Calculated Duty cicle: ");
+  debugln(E);
   if(E>MaxDty){
-    Serial.print("> Set Duty cicle: ");
-    Serial.println(MaxDty);
+    debug("> Set Duty cicle: ");
+    debugln(MaxDty);
     return MaxDty;
   }
   else if(E<5){
-    Serial.print("> Set Duty cicle: ");
-    Serial.println(5);
+    debug("> Set Duty cicle: ");
+    debugln(5);
     return 5;
   }
   return E;
@@ -295,13 +306,13 @@ int GetDty(int Pv){
 }
 
 void CheckStatus(){
-  Serial.println("--- Checking internal stats ---");
+  debugln("--- Checking internal stats ---");
     
   PowerState();
   CheckTemp();
   if((!digitalRead(PIDErr) && HeaterState) || digitalRead(WaterLevel)){
-    Serial.println("#### HEATER ERROR #### check water level or pid controller");
-    Serial.println("Turning OFF water heater :(");
+    debugln("#### HEATER ERROR #### check water level or pid controller");
+    debugln("Turning OFF water heater :(");
     digitalWrite(Heater, LOW);
     err1();
   }
@@ -329,7 +340,7 @@ void setup(){
 
   CheckTemp();
   HeaterEnable();
-  Serial.println(">>> VOID SETUP OK");
+  debugln(">>> VOID SETUP OK");
 }
 void loop(){
   
@@ -341,7 +352,7 @@ void loop(){
     
   if(PowerState()){
   
-  Serial.println(">>> POWER ON <<<");
+  debugln(">>> POWER ON <<<");
     //ON=true;
     tone(Buzz, 750, 1000);
     delay(500);
