@@ -1,10 +1,9 @@
 
-
 /***************************************************
 * Program:   Tetraphase brushless motor driver     *
 * Author:   Oriol Pascual                          *
 * Date:   07-JUL-21                                *
-* rev:    2.5                                      *
+* rev:    3.0                                      *
 ****************************************************/
 
 /*************************************************** 
@@ -17,8 +16,8 @@
 *                   2 for turn right away
 *                   3 for disable error checks
  ***************************************************/ 
-#define DEBUG 0
-#define MODE 3
+#define DEBUG 1
+#define MODE 0
 
 #if DEBUG == 1
 #define debug(x) Serial.print(x)
@@ -54,11 +53,15 @@
 
 
 // System Var's
-const unsigned long OnDelayPulse = 1500000; //us to wait pulsed to start the secuence
+const unsigned long OnDelayPulse = 150; //us to wait pulsed to start the secuence
 const int MaxDty = 90;  // duty cicle based on the coil PWM, in 0-254*Vin
-const float Kp=20;      // Kp used in the closed loop speed system
+const float Kp=2;      // Kp used in the closed loop speed system
+const float Ki=2;      // Ki used in the closed loop speed system
 const int MaxSpeed = 47; // max steep --> min millis per quarter rev 47 millis/quarte rev = 320RPM
 int Dty = 65;           // starting duty cicle
+int counter = 0, countMax=3;
+int pulse;
+int LastErr=0;
 bool ON = false;
 const int Tmax = 700;  // max temp, value from 0 to 1024
 const int speeds[10] = {75, 71, 68, 65, 63, 60, 58, 56, 54, 52}; //speed in millis per quarter of rev [ms]
@@ -70,7 +73,9 @@ bool PowerState(){  ////// <-----------------------------------------falla
   #if MODE != 1
   if(!digitalRead(MP)){
     Ti=millis();
+    debugln("Flank detected");
     while(!digitalRead(MP)){
+      debugln(!digitalRead(MP));
       delay(50);
     }
     Tf=millis();
@@ -94,7 +99,7 @@ bool PowerState(){  ////// <-----------------------------------------falla
 
 // --- Activates the coils C1, C2, C3, C4
 void step1(){
-    debugln("Activating coil num 1");
+    //debugln("Activating coil num 1");
     while(!digitalRead(ind1) && !digitalRead(ind2)&& !digitalRead(ind3)){
       analogWrite(C1, Dty);
     }
@@ -120,7 +125,7 @@ int Astep1(){
 }
 
 void step2(){
-  debugln("Activating coil num 2");
+  //debugln("Activating coil num 2");
     while(digitalRead(ind1) && !digitalRead(ind2)&& !digitalRead(ind3)){
       analogWrite(C2, Dty);
     }
@@ -128,7 +133,7 @@ void step2(){
     CheckStatus();
 }
 void step3(){
-  debugln("Activating coil num 3");
+  //debugln("Activating coil num 3");
     while(digitalRead(ind1) && digitalRead(ind2)&& !digitalRead(ind3)){
       analogWrite(C3, Dty);
     }
@@ -136,7 +141,7 @@ void step3(){
     CheckStatus();
 }
 void step4(){
-  debugln("Activating coil num 4");
+  //debugln("Activating coil num 4");
     while(digitalRead(ind1) && digitalRead(ind2)&& digitalRead(ind3)){
       analogWrite(C4, Dty);
     }
@@ -213,7 +218,7 @@ void CheckTemp(){
     debugln("### TEMP ERR ###");
     err1();
   }
-  debugln("-- TEMP OK --");
+  //debugln("-- TEMP OK --");
 }
 
 void err1(){
@@ -301,15 +306,21 @@ void GoToStart(){
 
 int GetDty(int Pv){
   debugln("--- SPEED P Control ---");
-  if(Pv>MaxSpeed){
+  if(Pv == 0 || Pv == 1){
+    return 5;
+  }
+  
+  else if(MaxSpeed > Pv){
     debugln("#### OVERSPEED DETECTED ####");   
     err2();
   }
+   
   int E, Sp=SetSpeed();
   
-  E=int((Sp-Pv)*(Kp/100));
+  E=int((Sp - Pv)*Kp +LastErr*Ki);
   debug("> Calculated Duty cicle: ");
   debugln(E);
+  LastErr=E;
   if(E>MaxDty){
     debug("> Set Duty cicle: ");
     debugln(MaxDty);
@@ -325,12 +336,17 @@ int GetDty(int Pv){
 }
 
 void CheckStatus(){
-  debugln("--- Checking internal stats ---");
+  //debugln("--- Checking internal stats ---");
   #if MODE != 3 
   bool PrivateAux=PowerState();
   CheckTemp();
-  if((!digitalRead(PIDErr) && HeaterState) || digitalRead(WaterLevel)){
+  if((digitalRead(PIDErr) && HeaterState) || digitalRead(WaterLevel)){
     debugln("#### HEATER ERROR #### check water level or pid controller");
+    debug("PIDErr, HeaterState, Waterlevel: ");
+    debug(digitalRead(PIDErr));
+    debug(HeaterState);
+    debugln(digitalRead(WaterLevel));
+    
     debugln("Turning OFF water heater :(");
     digitalWrite(Heater, LOW);
     err1();
@@ -338,7 +354,24 @@ void CheckStatus(){
   #endif
 }
 
-
+void Run(){
+  if(counter == countMax){
+        pulse=Astep1();
+        Dty = GetDty(pulse);
+        counter = 0;
+      }
+      else{
+        step1();
+        }
+      step2();
+      step3();
+      step4();
+      //debug(">counter: ");
+      //debugln(counter);
+      
+    counter++;
+  
+}
 void setup(){
   pinMode(CTemp, INPUT);
   pinMode(SPspeed, INPUT);
@@ -363,17 +396,9 @@ void setup(){
   debugln(">>> VOID SETUP OK");
 }
 void loop(){
-  
-  int counter = 0, countMax=5;
-  int pulse;
-  
- // if(pulseIn(MP, LOW, 180000000)>OnDelayPulse){
- // if(true){
-    
+  debugln("Hi");
   if(PowerState()){
-  
-  debugln(">>> POWER ON <<<");
-
+    debugln(">>> POWER ON <<<");
     tone(Buzz, 750, 1000);
     delay(500);
     digitalWrite(Led, LOW);
@@ -383,23 +408,10 @@ void loop(){
     
     Dty = 80;
     while(ON){
-      if(counter == countMax){
-        pulse=Astep1();
-        Dty = GetDty(pulse);
-        counter = 0;
-      }
-      else{
-        step1();
-        }
-      step2();
-      step3();
-      step4();
-      
-    counter++;
+      Run();
+      }  
     }
-
-      
+    else{
+      delay(5);
     }
-
-
 }
