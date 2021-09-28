@@ -1,11 +1,25 @@
+
+
 /***************************************************
 * Program:   Tetraphase brushless motor driver     *
 * Author:   Oriol Pascual                          *
 * Date:   07-JUL-21                                *
-* rev:    2.1                                      *
+* rev:    2.5                                      *
 ****************************************************/
 
+/*************************************************** 
+*                  --DEBUGGING-- 
+*      Set DEBUG to 0 for disable Serial Debugging
+*                   1 for enable Serial Debugging
+*                  
+*      Set MODE to  0 for normal operation
+*                   1 for power right up
+*                   2 for turn right away
+*                   3 for disable error checks
+ ***************************************************/ 
 #define DEBUG 0
+#define MODE 3
+
 #if DEBUG == 1
 #define debug(x) Serial.print(x)
 #define debugln(x) Serial.println(x)
@@ -53,6 +67,7 @@ bool HeaterState = false;
 bool RotorState = false;
 
 bool PowerState(){  ////// <-----------------------------------------falla
+  #if MODE != 1
   if(!digitalRead(MP)){
     Ti=millis();
     while(!digitalRead(MP)){
@@ -71,6 +86,10 @@ bool PowerState(){  ////// <-----------------------------------------falla
    }
    debugln("---NO CHANGE IN POWER STATE---");
    return ON;
+   #else
+    ON=true;
+    return true;
+   #endif
 }
 
 // --- Activates the coils C1, C2, C3, C4
@@ -307,8 +326,8 @@ int GetDty(int Pv){
 
 void CheckStatus(){
   debugln("--- Checking internal stats ---");
-    
-  PowerState();
+  #if MODE != 3 
+  bool PrivateAux=PowerState();
   CheckTemp();
   if((!digitalRead(PIDErr) && HeaterState) || digitalRead(WaterLevel)){
     debugln("#### HEATER ERROR #### check water level or pid controller");
@@ -316,6 +335,7 @@ void CheckStatus(){
     digitalWrite(Heater, LOW);
     err1();
   }
+  #endif
 }
 
 
@@ -353,11 +373,13 @@ void loop(){
   if(PowerState()){
   
   debugln(">>> POWER ON <<<");
-    //ON=true;
+
     tone(Buzz, 750, 1000);
     delay(500);
     digitalWrite(Led, LOW);
+    #if MODE != 2
     GoToStart();
+    #endif
     
     Dty = 80;
     while(ON){
