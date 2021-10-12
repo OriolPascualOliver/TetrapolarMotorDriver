@@ -21,7 +21,7 @@
  ***************************************************/ 
 #define DEBUG 1
 #define MODE 0
-#define ENsound 0
+#define ENsound 1
 
 #if DEBUG == 1
 #define debug(x) Serial.print(x)
@@ -41,12 +41,12 @@
 #define ind3 7
 
 #define PIDErr A4   // Temp controller error
-#define SoftStart 8 // Relay to short a high power R seried to the cap to create a soft start
+#define SoftStart 11 // Relay to short a high power R seried to the cap to create a soft start
 #define Heater 2    // Relay to the controller
 #define WaterLevel A3 // Water level Bistae digital sensor
 #define Buzz 12     // UI
 #define MP 11
-#define Led 13
+#define Led 8
 
 #define C1 10       // Coil outputs
 #define C2 9
@@ -58,14 +58,15 @@
 
 // System Var's
 const unsigned long OnDelayPulse = 1500; //ms to wait pulsed to start the secuence
-const int MaxDty = 90;  // duty cicle based on the coil PWM, in 0-254*Vin
-const float Kp=2;      // Kp used in the closed loop speed system
-const float Ki=2;      // Ki used in the closed loop speed system
-const int MaxSpeed = 47; // max steep --> min millis per quarter rev 47 millis/quarte rev = 320RPM
+const int MaxDty = 150;  // duty cicle based on the coil PWM, in 0-254*Vin
+const float Kp=1;      // Kp used in the closed loop speed system
+const float Ki=0.25;      // Ki used in the closed loop speed system
+const int MaxSpeed = 188; // max steep --> min millis per quarter rev 47 millis/quarte rev = 320RPM
 int Dty = 65;           // starting duty cicle
 int counter = 0, countMax=3;
 int pulse;
 int LastErr=0;
+uint8_t MaxSpeedCount=0;
 bool ON = false;
 const int Tmax = 700;  // max temp, value from 0 to 1024
 const int speeds[10] = {75, 71, 68, 65, 63, 60, 58, 56, 54, 52}; //speed in millis per quarter of rev [ms]
@@ -77,22 +78,24 @@ bool PowerState(){
   #if MODE != 1
   if(!digitalRead(MP)){
     Ti=millis();
-    debugln("> UP Flank detected");
+    //debugln("> UP Flank detected");
     while(!digitalRead(MP)){
       delay(50);
     }
     Tf=millis();
     aux=Tf-Ti;
-    debug("MP detected, Elapsed time: ");
-    debugln(aux);
+    //debug("MP detected, Elapsed time: ");
+    //debugln(aux);
     if(aux>OnDelayPulse){
-      debugln("---CHANGE IN POWER STATE---");
+      //debugln("---CHANGE IN POWER STATE---");
+      tone(Buzz, 750, 1000);
       ON=!ON;
+      digitalWrite(Led, ON);
       return ON;
       
     }
    }
-   debugln("---NO CHANGE IN POWER STATE---");
+   //debugln("---NO CHANGE IN POWER STATE---");
    return ON;
    #else
     ON=true;
@@ -100,35 +103,59 @@ bool PowerState(){
    #endif
 }
 
+int Aturn(){
+  Ti=millis();
 
-void step1(){
-    debugln("C1");
-    while(!digitalRead(ind1) && !digitalRead(ind2)&& !digitalRead(ind3)){
+  debugln(Ti);
+  while(!digitalRead(ind1) && !digitalRead(ind2)&& !digitalRead(ind3)){
       analogWrite(C1, Dty);
     }
     digitalWrite(C1, LOW);
-    CheckStatus();
     
-}
-int Astep1(){
-  /*
-   * returns the time it took per 1/4 rev
-   */
-   debug("---->C1 w/ time control, pulse time: ");
-    Ti=millis();
-    while(!digitalRead(ind1) && !digitalRead(ind2)&& !digitalRead(ind3)){
-      analogWrite(C1, Dty);
+  while(digitalRead(ind1) && !digitalRead(ind2)&& !digitalRead(ind3)){
+      analogWrite(C2, Dty);
     }
+    digitalWrite(C2, LOW);
+
+  while(digitalRead(ind1) && digitalRead(ind2)&& !digitalRead(ind3)){
+      analogWrite(C3, Dty);
+    }
+    digitalWrite(C3, LOW);
     
-    digitalWrite(C1, LOW);
+  while(digitalRead(ind1) && digitalRead(ind2)&& digitalRead(ind3)){
+      analogWrite(C4, Dty);
+    }
+    digitalWrite(C4, LOW);
     Tf=millis();
+    //
+    
+    //
+    debugln(Tf);
+    debug("Time: ");
     debugln(Tf-Ti);
     CheckStatus();
     return int(Tf-Ti);
+    /*
+    Tf=pulseIn(ind2, HIGH);
+    debug("Time: ");
+    debugln(Tf);
+    return(Tf/1000);
+    */
+}
+
+
+void step1(){
+    //debugln("C1");
+    while(!digitalRead(ind1) && !digitalRead(ind2)&& !digitalRead(ind3)){
+      analogWrite(C1, Dty);
+    }
+    digitalWrite(C1, LOW);
+    CheckStatus();
+    
 }
 
 void step2(){
-  debugln("C2");
+  //debugln("C2");
     while(digitalRead(ind1) && !digitalRead(ind2)&& !digitalRead(ind3)){
       analogWrite(C2, Dty);
     }
@@ -136,7 +163,7 @@ void step2(){
     CheckStatus();
 }
 void step3(){
-  debugln("C3");
+  //debugln("C3");
     while(digitalRead(ind1) && digitalRead(ind2)&& !digitalRead(ind3)){
       analogWrite(C3, Dty);
     }
@@ -144,7 +171,7 @@ void step3(){
     CheckStatus();
 }
 void step4(){
-  debugln("C4");
+  //debugln("C4");
     while(digitalRead(ind1) && digitalRead(ind2)&& digitalRead(ind3)){
       analogWrite(C4, Dty);
     }
@@ -153,10 +180,15 @@ void step4(){
 }
 
 // ---
+void ToRpm(int Time){
+   debug("RPM's: ");
+   float RPM = (15000/Time);
+   debugln(RPM);
+}
 
 void HeaterEnable(){
   if(!digitalRead(WaterLevel) && !HeaterState){
-    debugln("Waterlevel OK, ---ACTIVATING HEATER RELAY---");
+    //debugln("Waterlevel OK, ---ACTIVATING HEATER RELAY---");
     HeaterState=true;
     digitalWrite(Heater, HIGH);
     }
@@ -170,9 +202,9 @@ int SetSpeed(){
   OUTPUT INT
   */
   int SPd = speeds[map(analogRead(SPspeed), 0, 1023, 0, 9)];
-  debug("Speed readed, SetSpeed: ");
-  debugln(SPd);
-  return SPd;
+  debug("SP: ");
+  debugln(SPd*4);
+  return SPd*4;
 }
 
 
@@ -185,23 +217,23 @@ int CheckPosition(){
   bool I2 = digitalRead(ind2);
   bool I3 = digitalRead(ind3);
   
-  debug("Facing Coil num: ");
+  //debug("Facing Coil num: ");
   
   
   if(!I1 && !I2 && !I3){
-    debugln(1);
+    //debugln(1);
     return 1;
   }
   else if(I1 && !I2 && !I3){
-    debugln(2);
+    //debugln(2);
     return 2;
   }
   else if(I1 && I2 && !I3){
-    debugln(3);
+    //debugln(3);
     return 3;
   }
   else{
-    debugln(4);
+    //debugln(4);
     return 4;
   }
 }
@@ -214,7 +246,7 @@ void CheckTemp(){
   // --- NOTE ---
   // for PTC change the sign of the operator
   if(analogRead(CTemp)>Tmax){
-    debugln("### TEMP ERR ###");
+    //debugln("### TEMP ERR ###");
     err1();
   }
 }
@@ -289,7 +321,7 @@ void GoToStart(){
   /*
   goes to a known position to start in a known direction
   */
-  debugln("--- GOING TO START POSITION ---");
+  //debugln("--- GOING TO START POSITION ---");
   digitalWrite(SoftStart, HIGH);
   switch (CheckPosition()){
 
@@ -318,47 +350,62 @@ void GoToStart(){
 
 
 int GetDty(int Pv){
-  debugln("--- SPEED PI Control ---");
+  //debugln("--- SPEED PI Control ---");
+  ToRpm(Pv);
   if(Pv == 0 || Pv == 1){
-    debugln("Wrong PV :(");
     if(LastErr>MaxDty){
       counter --;
+      debug("PID: ");
+      debugln(MaxDty);
       return MaxDty;
+      
     }
     else if(LastErr<5){
       counter --;
+      debug("PID: ");
+      debugln(5);
       return 5;
     }
     else{
       counter --;
+      debug("PID: ");
+      debugln(5);
       return 5;
     }
   }
   
-  else if(MaxSpeed > Pv){
+  else if(MaxSpeed > Pv && MaxSpeedCount>=100){
     debugln("#### OVERSPEED DETECTED ####");   
     err2();
+  }
+  else if(MaxSpeed > Pv){
+    MaxSpeedCount ++;
+    debug("PID: ");
+      debug(5);
+    return 5;
   }
    
   int E, Sp=SetSpeed();
   
-  E=int((Sp - Pv)*Kp +LastErr*Ki);
-  debug("> Calculated Duty cicle: ");
+  E=int((Pv - Sp)*Kp +LastErr*Ki);
+  debug("Error: ");
   debugln(E);
   LastErr=E;
   if(E>MaxDty){
-    debug("> Set Duty cicle: ");
+    debug("PID: ");
     debugln(MaxDty);
     counter=0;
     return MaxDty;
   }
   else if(E<5){
-    debug("> Set Duty cicle: ");
+    debug("PID: ");
     debugln(5);
     counter=0;
     return 5;
   }
   counter=0;
+  debug("PID: ");
+  debug(E);
   return E;
  
 }
@@ -378,16 +425,17 @@ void CheckStatus(){
 }
 
 void Run(){
-  if(counter == countMax){
-        pulse=Astep1();
-        Dty = GetDty(pulse);
-      }
-      else{
+  if(counter < countMax){
         step1();
+        step2();
+        step3();
+        step4();
+      }
+  else{
+        pulse=Aturn();
+        Dty = GetDty(pulse);
         }
-      step2();
-      step3();
-      step4();
+      
       //debug(">counter: ");
       //debugln(counter);
       
@@ -411,19 +459,21 @@ void setup(){
   pinMode(Heater, OUTPUT);
   pinMode(WaterLevel, INPUT_PULLUP);
   digitalWrite(Led, HIGH);
+  digitalWrite(SoftStart, HIGH);
+  delay(500);
+  digitalWrite(Led, LOW);
   Serial.begin(9600);
 
   CheckTemp();
   HeaterEnable();
-  debugln(">>> VOID SETUP OK");
+  //debugln(">>> VOID SETUP OK");
 }
 void loop(){
-  debugln(">>> ENTERING VOID LOOP");
+  //debugln(">>> ENTERING VOID LOOP");
   if(PowerState()){
-    debugln(">>> POWER ON <<<");
-    tone(Buzz, 750, 1000);
+    //debugln(">>> POWER ON <<<");
     delay(500);
-    digitalWrite(Led, LOW);
+    //digitalWrite(Led, HIGH);
     #if MODE != 2
     GoToStart();
     #endif
