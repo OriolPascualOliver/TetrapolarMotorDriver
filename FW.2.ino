@@ -38,8 +38,8 @@
 #define PIDErr    A4   // Temp controller error
 
 // Pin 0,1 dedicated for UART comunication
-#define Heater    2    // Relay to the controller
-#define ind1      3      // DigIn for the absolute position encoder
+#define Heater    2    // Relay to the PID external controller
+#define ind1      3      // DigIn for the absolute position encoder //HAS TO BE CHANGED :(
 #define ind2      4      // Ind1:top one, Ind2: middle one, Ind3: bottom one
 #define C4        5
 #define C3        6
@@ -50,7 +50,8 @@
 #define MP        11  //possible substitut a A5
 #define Buzz      12     // UI
 #define SoftStart 13  // Relay to short a high power R seried to the cap to create a soft start for the first seconds
-//UPDATE PIN 13!
+        
+        //UPDATE PIN 13!
 
 
 // System Var's
@@ -61,7 +62,6 @@ const float Ki=0.25;      // Ki used in the closed loop speed system
 const uint16_t MaxSpeed = 188; // max steep --> min millis per quarter rev 47 millis/quarte rev = 320RPM
 uint8_t Dty = 65;           // starting duty cicle
 uint8_t counter = 0, countMax=3;
-int pulse;
 int LastErr=0;
 uint8_t MaxSpeedCount=0;
 bool ON = false;
