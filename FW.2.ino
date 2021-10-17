@@ -115,7 +115,7 @@ bool PowerState(){
    #endif
 } 
 
-int Aturn(){ // MAKE IT WOR>K
+int Aturn(){ // MAKE IT WOR>K :(
   Ti=millis();
 
   debugln(Ti);
@@ -157,30 +157,34 @@ int Aturn(){ // MAKE IT WOR>K
 
 
 void step1(){
-    //digitalWrite(C1, HIGH);
+    digitalWrite(C1, HIGH);
+    delayMicroseconds(10);
     while(!digitalRead(ind1) && !digitalRead(ind2)&& !digitalRead(ind3)){
-      analogWrite(C1, Dty);
+      //analogWrite(C1, Dty);
     }
     digitalWrite(C1, LOW);
 }
 void step2(){
-    //digitalWrite(C2, HIGH);
+    digitalWrite(C2, HIGH);
+    delayMicroseconds(10);
     while(digitalRead(ind1) && !digitalRead(ind2)&& !digitalRead(ind3)){
-      analogWrite(C2, Dty);
+      //analogWrite(C2, Dty);
     }
     digitalWrite(C2, LOW);
 }
 void step3(){
-    //digitalWrite(C3, HIGH);
+    digitalWrite(C3, HIGH);
+    delayMicroseconds(10);
     while(digitalRead(ind1) && digitalRead(ind2)&& !digitalRead(ind3)){
-      analogWrite(C3, Dty);
+      //analogWrite(C3, Dty);
     }
     digitalWrite(C3, LOW);
 }
 void step4(){
-    //digitalWrite(C4, HIGH);
+    digitalWrite(C4, HIGH);
+    delayMicroseconds(10);
     while(digitalRead(ind1) && digitalRead(ind2)&& digitalRead(ind3)){
-      analogWrite(C4, Dty);
+      //analogWrite(C4, Dty);
     }
     digitalWrite(C4, LOW);
 }
