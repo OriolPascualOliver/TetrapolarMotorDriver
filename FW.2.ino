@@ -201,6 +201,11 @@ void ToRpm(int Time){
    debugln(RPM);
 }
 
+void WriteDTY(int Duty){
+      pwmWrite(PWMOut, GetPWM); 
+        
+}
+
 void HeaterEnable(){
   if(!digitalRead(WaterLevel) && !HeaterState){
     //debugln("Waterlevel OK, ---ACTIVATING HEATER RELAY---");
