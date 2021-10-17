@@ -30,16 +30,20 @@
 #define debugln(x)
 #endif
 
+#include <PWM.h>
+// link library: https://github.com/terryjmyers/PWM
+
 // GPIO's
 #define SPspeed   A0  // analog value k to the Set point for the speed
 #define CTemp     A1    // analog value k to the temp of the coil
 #define CSens     A2    // current sensor
 #define WaterLevel A3 // Water level Bistae digital sensor
 #define PIDErr    A4   // Temp controller error
+#define ind1      A5    // DigIn for the absolute position encoder
 
 // Pin 0,1 dedicated for UART comunication
 #define Heater    2    // Relay to the PID external controller
-#define ind1      3      // DigIn for the absolute position encoder //HAS TO BE CHANGED :(
+#define PWMOut    3       // coil pwm out
 #define ind2      4      // Ind1:top one, Ind2: middle one, Ind3: bottom one
 #define C4        5
 #define C3        6
@@ -61,6 +65,7 @@ const float Kp=0.8;      // Kp used in the closed loop speed system
 const float Ki=0.25;      // Ki used in the closed loop speed system
 const uint16_t MaxSpeed = 188; // max steep --> min millis per quarter rev 47 millis/quarte rev = 320RPM
 uint8_t Dty = 65;           // starting duty cicle
+int32_t frequency = 3000; // freq of the coil pwm output
 uint8_t counter = 0, countMax=3;
 int LastErr=0;
 uint8_t MaxSpeedCount=0;
@@ -459,6 +464,14 @@ void setup(){
   pinMode(WaterLevel, INPUT_PULLUP);
   digitalWrite(Led, HIGH);
   digitalWrite(SoftStart, HIGH);
+  
+        
+  InitTimersSafe(); 
+  bool success = SetPinFrequencySafe(PWMOut, frequency);
+  if( !success){
+          err1();
+  }
+        
   delay(500);
   digitalWrite(Led, LOW);
   Serial.begin(9600);
