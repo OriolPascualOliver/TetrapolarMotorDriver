@@ -2,7 +2,7 @@
 * Program:   Tetraphase brushless motor driver     *
 * Author:   Oriol Pascual                          *
 * Date:   07-JUL-21                                *
-* rev:    3.5                                      *
+* rev:    3.5, Release: 18/10/2021                 *
 ****************************************************/
 
 /*************************************************** 
@@ -29,9 +29,6 @@
 #define debug(x)
 #define debugln(x)
 #endif
-
-#include <PWM.h>
-// link library: https://github.com/terryjmyers/PWM
 
 // GPIO's
 #define SPspeed   A0  // analog value k to the Set point for the speed
@@ -60,17 +57,16 @@
 
 // System Var's
 const unsigned long OnDelayPulse = 1500; //ms to wait pulsed to start the secuence
-const uint16_t MaxDty = 150;  // duty cicle based on the coil PWM, in 0-254*Vin
+const uint16_t MaxDty = 250;  // duty cicle based on the coil PWM, in 0-254*Vin
 const float Kp=0.8;      // Kp used in the closed loop speed system
 const float Ki=0.25;      // Ki used in the closed loop speed system
 const uint16_t MaxSpeed = 188; // max steep --> min millis per quarter rev 47 millis/quarte rev = 320RPM
 uint8_t Dty = 65;           // starting duty cicle
-int32_t frequency = 3000; // freq of the coil pwm output
 uint8_t counter = 0, countMax=3;
 int LastErr=0;
 uint8_t MaxSpeedCount=0;
 bool ON = false;
-const uint8_t Tmax = 700;  // max temp, value from 0 to 1024
+const uint16_t Tmax = 700;  // max temp, value from 0 to 1024
 const int speeds[10] = {75, 71, 68, 65, 63, 60, 58, 56, 54, 52}; //speed in millis per quarter of rev [ms]
 uint8_t Spd_multiplier = 4;
 unsigned long Ti, Tf, aux; 
@@ -80,13 +76,7 @@ bool RotorState = false;
 /*
 TCCR1 = 0xB2;
 ICR1 = 0x01FF;
-
-
 OCR1A = pwm (analog/2)
-
-
-
-
 */
 
 
@@ -121,33 +111,42 @@ bool PowerState(){
 } 
 
 int Aturn(){ // MAKE IT WOR>K :(
+  debugln(">>>> Aturn");
   Ti=millis();
 
-  debugln(Ti);
-  while(!digitalRead(ind1) && !digitalRead(ind2)&& !digitalRead(ind3)){
-      analogWrite(C1, Dty);
+  
+    digitalWrite(C1, HIGH);
+    delayMicroseconds(5000);
+    while(!digitalRead(ind1)){
+   
     }
     digitalWrite(C1, LOW);
     
-  while(digitalRead(ind1) && !digitalRead(ind2)&& !digitalRead(ind3)){
-      analogWrite(C2, Dty);
+    digitalWrite(C2, HIGH);
+    delayMicroseconds(5000);
+    while(!digitalRead(ind2) && digitalRead(ind1)){
+ 
     }
     digitalWrite(C2, LOW);
 
-  while(digitalRead(ind1) && digitalRead(ind2)&& !digitalRead(ind3)){
-      analogWrite(C3, Dty);
+    digitalWrite(C3, HIGH);
+    delayMicroseconds(5000);
+    while(!digitalRead(ind3) && digitalRead(ind2)){
+      
     }
     digitalWrite(C3, LOW);
-    
-  while(digitalRead(ind1) && digitalRead(ind2)&& digitalRead(ind3)){
-      analogWrite(C4, Dty);
+
+    digitalWrite(C4, HIGH);
+    debugln("C4");
+    delayMicroseconds(5000);
+    while(digitalRead(ind1) || digitalRead(ind2)){
+      
     }
     digitalWrite(C4, LOW);
     Tf=millis();
     //
     
     //
-    debugln(Tf);
     debug("Time: ");
     debugln(Tf-Ti);
     CheckStatus();
@@ -163,48 +162,50 @@ int Aturn(){ // MAKE IT WOR>K :(
 
 void step1(){
     digitalWrite(C1, HIGH);
-    delayMicroseconds(10);
-    while(!digitalRead(ind1) && !digitalRead(ind2)&& !digitalRead(ind3)){
-      //analogWrite(C1, Dty);
+    debugln("C1");
+    delayMicroseconds(5000);
+    while(!digitalRead(ind1)){
+
     }
     digitalWrite(C1, LOW);
 }
 void step2(){
     digitalWrite(C2, HIGH);
-    delayMicroseconds(10);
-    while(digitalRead(ind1) && !digitalRead(ind2)&& !digitalRead(ind3)){
-      //analogWrite(C2, Dty);
+    debugln("C2");
+    delayMicroseconds(5000);
+    while(!digitalRead(ind2) && digitalRead(ind1)){
+
     }
     digitalWrite(C2, LOW);
 }
 void step3(){
     digitalWrite(C3, HIGH);
-    delayMicroseconds(10);
-    while(digitalRead(ind1) && digitalRead(ind2)&& !digitalRead(ind3)){
-      //analogWrite(C3, Dty);
+    debugln("C3");
+    delayMicroseconds(5000);
+    while(!digitalRead(ind3) && digitalRead(ind2)){
+
     }
     digitalWrite(C3, LOW);
 }
 void step4(){
     digitalWrite(C4, HIGH);
-    delayMicroseconds(10);
-    while(digitalRead(ind1) && digitalRead(ind2)&& digitalRead(ind3)){
-      //analogWrite(C4, Dty);
+    debugln("C4");
+    delayMicroseconds(5000);
+    while(digitalRead(ind1) || digitalRead(ind2)){
+
     }
     digitalWrite(C4, LOW);
 }
 
 // ---
-void ToRpm(int Time){
-   debug("RPM's: ");
-   float RPM = (15000/Time);
-   debugln(RPM);
-}
 
-void WriteDTY(int Duty){
-      pwmWrite(PWMOut, GetPWM); 
+/*
+int WriteDty(int Duty){
+      
+      return Duty;
         
 }
+*/
 
 void HeaterEnable(){
   if(!digitalRead(WaterLevel) && !HeaterState){
@@ -336,6 +337,7 @@ void GoToStart(){
   */
   //debugln("--- GOING TO START POSITION ---");
   digitalWrite(SoftStart, HIGH);
+  analogWrite(PWMOut, Dty);
   switch (CheckPosition()){
 
     case 1:
@@ -362,7 +364,7 @@ void GoToStart(){
 
 
 
-int GetDty(int Pv){
+uint8_t GetDty(int Pv){
   debugln("--- SPEED PI Control ---");
   //ToRpm(Pv);
   if(Pv == 0 || Pv == 1){
@@ -370,20 +372,20 @@ int GetDty(int Pv){
       counter --;
       debug("PID: ");
       debugln(MaxDty);
-      return MaxDty;
+      analogWrite(PWMOut, MaxDty);
       
     }
     else if(LastErr<5){
       counter --;
       debug("PID: ");
       debugln(5);
-      return 5;
+      analogWrite(PWMOut, 5);
     }
     else{
       counter --;
       debug("PID: ");
       debugln(5);
-      return 5;
+      analogWrite(PWMOut, 5);
     }
   }
   
@@ -395,7 +397,7 @@ int GetDty(int Pv){
     MaxSpeedCount ++;
     debug("PID: ");
     debug(5);
-    return 5;
+    analogWrite(PWMOut, 5);
   }
    
   int E, Sp=SetSpeed();
@@ -408,18 +410,18 @@ int GetDty(int Pv){
     debug("PID: ");
     debugln(MaxDty);
     counter=0;
-    return MaxDty;
+    analogWrite(PWMOut, MaxDty);
   }
   else if(E<5){
     debug("PID: ");
     debugln(5);
     counter=0;
-    return 5;
+    analogWrite(PWMOut, 5);
   }
   counter=0;
   debug("PID: ");
   debug(E);
-  return E;
+  analogWrite(PWMOut, E);
  
 }
 
@@ -444,9 +446,10 @@ void Run(){
         step2();
         step3();
         step4();
+
       }
   else{
-        Dty = GetDty(Aturn());
+        GetDty(Aturn());
         }     
     counter++;
   
@@ -469,13 +472,9 @@ void setup(){
   pinMode(WaterLevel, INPUT_PULLUP);
   digitalWrite(Led, HIGH);
   digitalWrite(SoftStart, HIGH);
+  digitalWrite(PWMOut, OUTPUT);
   
         
-  InitTimersSafe(); 
-  bool success = SetPinFrequencySafe(PWMOut, frequency);
-  if( !success){
-          err1();
-  }
         
   delay(500);
   digitalWrite(Led, LOW);
