@@ -93,7 +93,7 @@ bool PowerState(){
     Tf=millis();
     aux=Tf-Ti;
 
-    if(aux>OnDelayPulse){
+    if(aux>OnDelayPulse){ 
 
       tone(Buzz, 750, 1000);
       ON=!ON;
