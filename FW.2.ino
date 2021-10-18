@@ -1,8 +1,9 @@
+
 /***************************************************
 * Program:   Tetraphase brushless motor driver     *
 * Author:   Oriol Pascual                          *
 * Date:   07-JUL-21                                *
-* rev:    3.5                                      *
+* rev:    3.0, Release: 17/10/2021                 *
 ****************************************************/
 
 /*************************************************** 
@@ -31,75 +32,62 @@
 #endif
 
 // GPIO's
-#define SPspeed   A0  // analog value k to the Set point for the speed
-#define CTemp     A1    // analog value k to the temp of the coil
-#define CSens     A2    // current sensor
-#define WaterLevel A3 // Water level Bistae digital sensor
-#define PIDErr    A4   // Temp controller error
+#define CTemp A1    // analog value k to the temp of the coil
+#define SPspeed A0  // analog value k to the Set point for the speed
+#define CSens A2    // current sensor
 
-// Pin 0,1 dedicated for UART comunication
-#define Heater    2    // Relay to the controller
-#define ind1      3      // DigIn for the absolute position encoder
-#define ind2      4      // Ind1:top one, Ind2: middle one, Ind3: bottom one
-#define C4        5
-#define C3        6
-#define ind3      7
-#define Led       8
-#define C2        9   //TCNT1
-#define C1        10  //TCNT1      // Coil outputs
-#define MP        11  //possible substitut a A5
-#define Buzz      12     // UI
-#define SoftStart 13  // Relay to short a high power R seried to the cap to create a soft start for the first seconds
-//UPDATE PIN 13!
+#define ind1 3      // DigIn for the absolute position encoder
+#define ind2 4      // Ind1:top one, Ind2: middle one, Ind3: bottom one
+#define ind3 7
+
+#define PIDErr A4   // Temp controller error
+#define SoftStart 13 // Relay to short a high power R seried to the cap to create a soft start
+#define Heater 2    // Relay to the controller
+#define WaterLevel A3 // Water level Bistae digital sensor
+#define Buzz 12     // UI
+#define MP 11
+#define Led 8
+
+#define C1 10       // Coil outputs
+#define C2 9
+#define C3 6
+#define C4 5
+
+
 
 
 // System Var's
 const unsigned long OnDelayPulse = 1500; //ms to wait pulsed to start the secuence
-const uint16_t MaxDty = 150;  // duty cicle based on the coil PWM, in 0-254*Vin
-const float Kp=0.8;      // Kp used in the closed loop speed system
+const int MaxDty = 150;  // duty cicle based on the coil PWM, in 0-254*Vin
+const float Kp=1;      // Kp used in the closed loop speed system
 const float Ki=0.25;      // Ki used in the closed loop speed system
-const uint16_t MaxSpeed = 188; // max steep --> min millis per quarter rev 47 millis/quarte rev = 320RPM
-uint8_t Dty = 65;           // starting duty cicle
-uint8_t counter = 0, countMax=3;
+const int MaxSpeed = 188; // max steep --> min millis per quarter rev 47 millis/quarte rev = 320RPM
+int Dty = 65;           // starting duty cicle
+int counter = 0, countMax=3;
 int pulse;
 int LastErr=0;
 uint8_t MaxSpeedCount=0;
 bool ON = false;
-const uint8_t Tmax = 700;  // max temp, value from 0 to 1024
+const int Tmax = 700;  // max temp, value from 0 to 1024
 const int speeds[10] = {75, 71, 68, 65, 63, 60, 58, 56, 54, 52}; //speed in millis per quarter of rev [ms]
-uint8_t Spd_multiplier = 4;
 unsigned long Ti, Tf, aux; 
 bool HeaterState = false;
 bool RotorState = false;
-
-/*
-TCCR1 = 0xB2;
-ICR1 = 0x01FF;
-
-
-OCR1A = pwm (analog/2)
-
-
-
-
-*/
-
-
-
 
 bool PowerState(){
   #if MODE != 1
   if(!digitalRead(MP)){
     Ti=millis();
-    debugln("> UP Flank detected");
+    //debugln("> UP Flank detected");
     while(!digitalRead(MP)){
       delay(50);
     }
     Tf=millis();
     aux=Tf-Ti;
-
+    //debug("MP detected, Elapsed time: ");
+    //debugln(aux);
     if(aux>OnDelayPulse){
-
+      //debugln("---CHANGE IN POWER STATE---");
       tone(Buzz, 750, 1000);
       ON=!ON;
       digitalWrite(Led, ON);
@@ -107,15 +95,15 @@ bool PowerState(){
       
     }
    }
-
+   //debugln("---NO CHANGE IN POWER STATE---");
    return ON;
    #else
     ON=true;
     return true;
    #endif
-} 
+}
 
-int Aturn(){ // MAKE IT WOR>K
+int Aturn(){
   Ti=millis();
 
   debugln(Ti);
@@ -157,32 +145,38 @@ int Aturn(){ // MAKE IT WOR>K
 
 
 void step1(){
-    //digitalWrite(C1, HIGH);
+    //debugln("C1");
     while(!digitalRead(ind1) && !digitalRead(ind2)&& !digitalRead(ind3)){
       analogWrite(C1, Dty);
     }
     digitalWrite(C1, LOW);
+    CheckStatus();
+    
 }
+
 void step2(){
-    //digitalWrite(C2, HIGH);
+  //debugln("C2");
     while(digitalRead(ind1) && !digitalRead(ind2)&& !digitalRead(ind3)){
       analogWrite(C2, Dty);
     }
     digitalWrite(C2, LOW);
+    CheckStatus();
 }
 void step3(){
-    //digitalWrite(C3, HIGH);
+  //debugln("C3");
     while(digitalRead(ind1) && digitalRead(ind2)&& !digitalRead(ind3)){
       analogWrite(C3, Dty);
     }
     digitalWrite(C3, LOW);
+    CheckStatus();
 }
 void step4(){
-    //digitalWrite(C4, HIGH);
+  //debugln("C4");
     while(digitalRead(ind1) && digitalRead(ind2)&& digitalRead(ind3)){
       analogWrite(C4, Dty);
     }
     digitalWrite(C4, LOW);
+    CheckStatus();
 }
 
 // ---
@@ -197,7 +191,8 @@ void HeaterEnable(){
     //debugln("Waterlevel OK, ---ACTIVATING HEATER RELAY---");
     HeaterState=true;
     digitalWrite(Heater, HIGH);
-  }  
+    }
+    
  }
 
  
@@ -208,8 +203,8 @@ int SetSpeed(){
   */
   int SPd = speeds[map(analogRead(SPspeed), 0, 1023, 0, 9)];
   debug("SP: ");
-  debugln(SPd*Spd_multiplier);
-  return SPd*Spd_multiplier;
+  debugln(SPd*4);
+  return SPd*4;
 }
 
 
@@ -222,17 +217,23 @@ int CheckPosition(){
   bool I2 = digitalRead(ind2);
   bool I3 = digitalRead(ind3);
   
+  //debug("Facing Coil num: ");
+  
   
   if(!I1 && !I2 && !I3){
+    //debugln(1);
     return 1;
   }
   else if(I1 && !I2 && !I3){
+    //debugln(2);
     return 2;
   }
   else if(I1 && I2 && !I3){
+    //debugln(3);
     return 3;
   }
   else{
+    //debugln(4);
     return 4;
   }
 }
@@ -245,7 +246,7 @@ void CheckTemp(){
   // --- NOTE ---
   // for PTC change the sign of the operator
   if(analogRead(CTemp)>Tmax){
-    debugln("### TEMP ERR ###");
+    //debugln("### TEMP ERR ###");
     err1();
   }
 }
@@ -349,8 +350,8 @@ void GoToStart(){
 
 
 int GetDty(int Pv){
-  debugln("--- SPEED PI Control ---");
-  //ToRpm(Pv);
+  //debugln("--- SPEED PI Control ---");
+  ToRpm(Pv);
   if(Pv == 0 || Pv == 1){
     if(LastErr>MaxDty){
       counter --;
@@ -380,7 +381,7 @@ int GetDty(int Pv){
   else if(MaxSpeed > Pv){
     MaxSpeedCount ++;
     debug("PID: ");
-    debug(5);
+      debug(5);
     return 5;
   }
    
@@ -423,7 +424,6 @@ void CheckStatus(){
   #endif
 }
 
-
 void Run(){
   if(counter < countMax){
         step1();
@@ -432,8 +432,13 @@ void Run(){
         step4();
       }
   else{
-        Dty = GetDty(Aturn());
-        }     
+        pulse=Aturn();
+        Dty = GetDty(pulse);
+        }
+      
+      //debug(">counter: ");
+      //debugln(counter);
+      
     counter++;
   
 }
@@ -461,11 +466,12 @@ void setup(){
 
   CheckTemp();
   HeaterEnable();
-  debugln(">>> VOID SETUP OK");
+  //debugln(">>> VOID SETUP OK");
 }
 void loop(){
+  //debugln(">>> ENTERING VOID LOOP");
   if(PowerState()){
-    debugln(">>> POWER ON <<<");
+    //debugln(">>> POWER ON <<<");
     delay(500);
     //digitalWrite(Led, HIGH);
     #if MODE != 2
@@ -475,7 +481,6 @@ void loop(){
     Dty = 80;
     while(ON){
       Run();
-      CheckStatus();
       }  
     }
     else{
