@@ -2,7 +2,7 @@
 * Program:   Tetraphase brushless motor driver     *
 * Author:   Oriol Pascual                          *
 * Date:   07-JUL-21                                *
-* rev:    3.5, Release: 18/10/2021                 *
+* rev:    3.4, Release: 18/10/2021, Stat: STABLE   *
 ****************************************************/
 
 /*************************************************** 
@@ -31,38 +31,39 @@
 #endif
 
 // GPIO's
-#define SPspeed   A0  // analog value k to the Set point for the speed
-#define CTemp     A1    // analog value k to the temp of the coil
+#define SPspeed   A0   // analog value k to the Set point for the speed
+#define CTemp     A1     // analog value k to the temp of the coil
 #define CSens     A2    // current sensor
-#define WaterLevel A3 // Water level Bistae digital sensor
-#define PIDErr    A4   // Temp controller error
+#define WaterLevel A3  // Water level digital sensor
+#define PIDErr    A4     // Temp controller error + Err for CanPask Comunication
 #define ind1      A5    // DigIn for the absolute position encoder
+#define Update    A6   // Update for CanPask
+
 
 // Pin 0,1 dedicated for UART comunication
-#define Heater    2    // Relay to the PID external controller
-#define PWMOut    3       // coil pwm out
-#define ind2      4      // Ind1:top one, Ind2: middle one, Ind3: bottom one
+#define Heater    2      // Relay to the PID external controller
+#define PWMOut    3     // Data out for CanPask
+#define ind2      4    // Ind1:top one, Ind2: middle one, Ind3: bottom one
 #define C4        5
 #define C3        6
 #define ind3      7
 #define Led       8
-#define C2        9   //TCNT1
-#define C1        10  //TCNT1      // Coil outputs
-#define MP        11  //possible substitut a A5
-#define Buzz      12     // UI
-#define SoftStart 13  // Relay to short a high power R seried to the cap to create a soft start for the first seconds
+#define C2        9   
+#define C1        10      // Coil outputs
+#define MP        11 
+#define Buzz      12    // UI
+#define SoftStart 13   // Relay to short a high power R seried to the cap to create a soft start for the first seconds
         
-        //UPDATE PIN 13!
 
 
 // System Var's
 const unsigned long OnDelayPulse = 1500; //ms to wait pulsed to start the secuence
-const uint16_t MaxDty = 250;  // duty cicle based on the coil PWM, in 0-254*Vin
+const uint16_t MaxDty = 250, MinDty = 5;  // duty cicle based on the coil PWM, in 0-254*Vin
 const float Kp=0.8;      // Kp used in the closed loop speed system
 const float Ki=0.25;      // Ki used in the closed loop speed system
 const uint16_t MaxSpeed = 188; // max steep --> min millis per quarter rev 47 millis/quarte rev = 320RPM
-uint8_t Dty = 65;           // starting duty cicle
-uint8_t counter = 0, countMax=3;
+uint8_t Dty = 125;           // starting duty cicle
+uint8_t counter = 0, countMax = 2;
 int LastErr=0;
 uint8_t MaxSpeedCount=0;
 bool ON = false;
@@ -93,7 +94,7 @@ bool PowerState(){
     Tf=millis();
     aux=Tf-Ti;
 
-    if(aux>OnDelayPulse){ 
+    if(aux>OnDelayPulse){
 
       tone(Buzz, 750, 1000);
       ON=!ON;
@@ -110,14 +111,14 @@ bool PowerState(){
    #endif
 } 
 
-int Aturn(){ // MAKE IT WOR>K :(
+int Aturn(){
   debugln(">>>> Aturn");
   Ti=millis();
 
   
     digitalWrite(C1, HIGH);
     delayMicroseconds(5000);
-    while(!digitalRead(ind1)){
+    while(!digitalRead(ind1)){ //MISSING ANOTHER CONDITION!!!!
    
     }
     digitalWrite(C1, LOW);
@@ -144,19 +145,12 @@ int Aturn(){ // MAKE IT WOR>K :(
     }
     digitalWrite(C4, LOW);
     Tf=millis();
-    //
-    
-    //
+
     debug("Time: ");
     debugln(Tf-Ti);
     CheckStatus();
     return int(Tf-Ti);
-    /*
-    Tf=pulseIn(ind2, HIGH);
-    debug("Time: ");
-    debugln(Tf);
-    return(Tf/1000);
-    */
+
 }
 
 
@@ -197,15 +191,7 @@ void step4(){
     digitalWrite(C4, LOW);
 }
 
-// ---
 
-/*
-int WriteDty(int Duty){
-      
-      return Duty;
-        
-}
-*/
 
 void HeaterEnable(){
   if(!digitalRead(WaterLevel) && !HeaterState){
@@ -250,6 +236,11 @@ int CheckPosition(){
   else{
     return 4;
   }
+}
+
+void CanPask(int value){
+  analogWrite(PWMOut, value);
+  Serial.write(str(value));
 }
 
 void CheckTemp(){
@@ -336,8 +327,9 @@ void GoToStart(){
   goes to a known position to start in a known direction
   */
   //debugln("--- GOING TO START POSITION ---");
+
   digitalWrite(SoftStart, HIGH);
-  analogWrite(PWMOut, Dty);
+  CanPask(Dty);
   switch (CheckPosition()){
 
     case 1:
@@ -372,24 +364,18 @@ uint8_t GetDty(int Pv){
       counter --;
       debug("PID: ");
       debugln(MaxDty);
-      analogWrite(PWMOut, MaxDty);
+      CanPask(MaxDty);
       
-    }
-    else if(LastErr<5){
-      counter --;
-      debug("PID: ");
-      debugln(5);
-      analogWrite(PWMOut, 5);
     }
     else{
       counter --;
       debug("PID: ");
       debugln(5);
-      analogWrite(PWMOut, 5);
+      CanPask(MinDty);
     }
   }
   
-  else if(MaxSpeed > Pv && MaxSpeedCount>=100){
+  else if(MaxSpeed > Pv && MaxSpeedCount>=5){
     debugln("#### OVERSPEED DETECTED ####");   
     err2();
   }
@@ -397,7 +383,7 @@ uint8_t GetDty(int Pv){
     MaxSpeedCount ++;
     debug("PID: ");
     debug(5);
-    analogWrite(PWMOut, 5);
+    CanPask(MinDty);
   }
    
   int E, Sp=SetSpeed();
@@ -410,18 +396,18 @@ uint8_t GetDty(int Pv){
     debug("PID: ");
     debugln(MaxDty);
     counter=0;
-    analogWrite(PWMOut, MaxDty);
+    CanPask(MaxDty);
   }
   else if(E<5){
     debug("PID: ");
     debugln(5);
     counter=0;
-    analogWrite(PWMOut, 5);
+    CanPask(MinDty);
   }
   counter=0;
   debug("PID: ");
   debug(E);
-  analogWrite(PWMOut, E);
+  CanPask(E);
  
 }
 
@@ -470,9 +456,11 @@ void setup(){
   pinMode(C3, OUTPUT);
   pinMode(Heater, OUTPUT);
   pinMode(WaterLevel, INPUT_PULLUP);
+  pinMode(Update, OUTPUT);
+  digitalWrite(PWMOut, OUTPUT);
   digitalWrite(Led, HIGH);
   digitalWrite(SoftStart, HIGH);
-  digitalWrite(PWMOut, OUTPUT);
+  
   
         
         
