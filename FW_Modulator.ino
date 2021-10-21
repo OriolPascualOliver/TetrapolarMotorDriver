@@ -10,7 +10,7 @@
 //https://github.com/terryjmyers/PWM
 
 // GPIO's
-#define SpeedSens   2
+//#define SpeedSens   2
 #define Err         6
 #define LED         13
 #define PWM         3
@@ -19,9 +19,8 @@ uint32_t freq = 16000;
 uint32_t MinPeriod = 10; max speed period in ms
 int Duty;
 
-int GetPulse(){
+/*int GetPulse(){
     while(!digitalRead(SpeedSens)){
-   u
     }
     Ti=millis();
     while(digitalRead(SpeedSens)){
@@ -30,13 +29,14 @@ int GetPulse(){
     Tf=millis();
     return int(Tf-Ti);
 }
+*/
 
 void setup(){
     pinMode(Err, OUTPUT);
     pinMode(LED, OUTPUT);
-    pinMode(SpeedSens, INPUT);
-    pinMode(Data, INPUT);
-    pinMode(Update, INPUT);
+    //pinMode(SpeedSens, INPUT);
+    
+    //pinMode(Update, INPUT);
     Serial.begin(9600);
     //attachInterrupt(digitalPinToInterrupt(PIN), Funcio, RISING); //volatile a les variables
 
@@ -58,6 +58,7 @@ void setup(){
 void loop(){
     if(Serial.available()){
         Duty=int(Serial.readString());
+        
         pwmWrite(PWM, Dty);
     }
 
