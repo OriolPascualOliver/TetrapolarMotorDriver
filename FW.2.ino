@@ -2,7 +2,7 @@
 * Program:   Tetraphase brushless motor driver     *
 * Author:   Oriol Pascual                          *
 * Date:   07-JUL-21                                *
-* rev:    3.4, Release: 18/10/2021, Stat: STABLE   *
+* rev:    3.5, Release: 21/10/2021, Stat: STABLE   *
 ****************************************************/
 
 /*************************************************** 
@@ -18,7 +18,7 @@
 *                     0 to disable buzzer
 *                     
  ***************************************************/ 
-#define DEBUG 1
+#define DEBUG 0
 #define MODE 0
 #define ENsound 1
 
@@ -110,6 +110,20 @@ bool PowerState(){
     return true;
    #endif
 } 
+
+void CheckStatus(){
+  //debugln("--- Checking internal stats ---");
+  #if MODE != 3 
+  bool PrivateAux=PowerState();
+  CheckTemp();
+  if((digitalRead(PIDErr) && HeaterState) || digitalRead(WaterLevel)){
+    debugln("#### HEATER ERROR ####");
+    debugln("Turning OFF water heater :(");
+    digitalWrite(Heater, LOW);
+    err1();
+  }
+  #endif
+}
 
 int Aturn(){
   debugln(">>>> Aturn");
@@ -240,7 +254,9 @@ int CheckPosition(){
 
 void CanPask(int value){
   analogWrite(PWMOut, value);
-  Serial.write(str(value));
+  debugln("CanPaskiiiiiii:");
+  Serial.write(int(char(value)));
+  Serial.println();
 }
 
 void CheckTemp(){
@@ -355,7 +371,6 @@ void GoToStart(){
 }
 
 
-
 uint8_t GetDty(int Pv){
   debugln("--- SPEED PI Control ---");
   //ToRpm(Pv);
@@ -364,65 +379,61 @@ uint8_t GetDty(int Pv){
       counter --;
       debug("PID: ");
       debugln(MaxDty);
-      CanPask(MaxDty);
+      analogWrite(PWMOut, MaxDty);
+      return(MaxDty);
       
     }
     else{
       counter --;
       debug("PID: ");
-      debugln(5);
-      CanPask(MinDty);
+      debugln(MinDty);
+      analogWrite(PWMOut, MinDty);
+      return(MinDty);
     }
   }
   
-  else if(MaxSpeed > Pv && MaxSpeedCount>=5){
+  
+  else if(MaxSpeed > Pv && MaxSpeedCount>=100){
     debugln("#### OVERSPEED DETECTED ####");   
     err2();
   }
   else if(MaxSpeed > Pv){
     MaxSpeedCount ++;
     debug("PID: ");
-    debug(5);
-    CanPask(MinDty);
+    debug(MinDty);
+    analogWrite(PWMOut, MinDty);
+    
   }
-   
-  int E, Sp=SetSpeed();
-  
-  E=int((Pv - Sp)*Kp +LastErr*Ki);
-  debug("Error: ");
-  debugln(E);
-  LastErr=E;
-  if(E>MaxDty){
-    debug("PID: ");
-    debugln(MaxDty);
-    counter=0;
-    CanPask(MaxDty);
-  }
-  else if(E<5){
-    debug("PID: ");
-    debugln(5);
-    counter=0;
-    CanPask(MinDty);
-  }
-  counter=0;
-  debug("PID: ");
-  debug(E);
-  CanPask(E);
- 
-}
+  else{
 
-void CheckStatus(){
-  //debugln("--- Checking internal stats ---");
-  #if MODE != 3 
-  bool PrivateAux=PowerState();
-  CheckTemp();
-  if((digitalRead(PIDErr) && HeaterState) || digitalRead(WaterLevel)){
-    debugln("#### HEATER ERROR ####");
-    debugln("Turning OFF water heater :(");
-    digitalWrite(Heater, LOW);
-    err1();
-  }
-  #endif
+        int E, Sp=SetSpeed();
+    
+      E=int((Pv - Sp)*Kp +LastErr*Ki);
+        debug("Error: ");
+        debugln(E);
+        LastErr=E;
+        if(E>MaxDty){
+          debug("PID: ");
+          debugln(MaxDty);
+          counter=0;
+          analogWrite(PWMOut, MaxDty);
+          return(MaxDty);
+        }
+        else if(E<MinDty){
+          debug("PID: ");
+          debugln(MinDty);
+          counter=0;
+          analogWrite(PWMOut, MinDty);
+          return(MinDty);
+        }
+        else{
+        counter=0;
+        debug("PID: ");
+        debug(E);
+        analogWrite(PWMOut, E);
+        return(E);
+      }
+   }
 }
 
 
@@ -435,7 +446,7 @@ void Run(){
 
       }
   else{
-        GetDty(Aturn());
+        CanPask(GetDty(Aturn()));
         }     
     counter++;
   
