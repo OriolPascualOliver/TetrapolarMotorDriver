@@ -472,8 +472,21 @@ void setup(){
   digitalWrite(Led, HIGH);
   digitalWrite(SoftStart, HIGH);
   
-  
-        
+  /*for(;;){
+
+
+    digitalWrite(Led, HIGH);
+    digitalWrite(Heater, HIGH);
+    digitalWrite(SoftStart, HIGH);
+    delay(1000);
+    digitalWrite(Led, LOW);
+    digitalWrite(Heater, LOW);
+    digitalWrite(SoftStart, LOW);
+    delay(1000);
+
+    
+  }
+    */    
         
   delay(500);
   digitalWrite(Led, LOW);
