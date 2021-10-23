@@ -2,7 +2,7 @@
 * Program:   Tetraphase brushless motor modulator  *
 * Author:   Oriol Pascual                          *
 * Date:   18-OCT-21                                *
-* rev:    1.0, Release: 18/10/2021, Stat: TEST     *
+* rev:    1.0, Release: 23/10/2021, Stat: TEST     *
 ****************************************************/
 //Code for arduino ProMini!
 
@@ -14,7 +14,10 @@
 #define Err         6
 #define LED         13
 #define PWM         3
-#define Data A1
+#define Data A0
+#define DtyMin 5
+#define DtyMax 100
+
 
 uint32_t freq = 16000;
 uint32_t MinPeriod = 10; //max speed period in ms
@@ -57,7 +60,7 @@ void setup(){
 }
 void loop(){
     if(!digitalRead(Update)){
-        Dty=analogRead(Data);
+        Dty=map(analogRead(Data), 0, 1023, DtyMin, DtyMax);
               
     }
  pwmWrite(PWM, Dty);
