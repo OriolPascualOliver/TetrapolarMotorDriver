@@ -2,7 +2,7 @@
 * Program:   Tetraphase brushless motor driver     *
 * Author:   Oriol Pascual                          *
 * Date:   07-JUL-21                                *
-* rev:    3.4, Release: 18/10/2021, Stat: STABLE   *
+* rev:    3.5, Release: 21/10/2021, Stat: STABLE   *
 ****************************************************/
 
 /*************************************************** 
@@ -18,7 +18,7 @@
 *                     0 to disable buzzer
 *                     
  ***************************************************/ 
-#define DEBUG 1
+#define DEBUG 0
 #define MODE 0
 #define ENsound 1
 
@@ -33,7 +33,7 @@
 // GPIO's
 #define SPspeed   A0   // analog value k to the Set point for the speed
 #define CTemp     A1     // analog value k to the temp of the coil
-#define CSens     A2    // current sensor
+#define ModulatorErr A2 // Sever modulator error W CanPask
 #define WaterLevel A3  // Water level digital sensor
 #define PIDErr    A4     // Temp controller error + Err for CanPask Comunication
 #define ind1      A5    // DigIn for the absolute position encoder
@@ -58,11 +58,11 @@
 
 // System Var's
 const unsigned long OnDelayPulse = 1500; //ms to wait pulsed to start the secuence
-const uint16_t MaxDty = 250;  // duty cicle based on the coil PWM, in 0-254*Vin
+const uint16_t MaxDty = 250, MinDty = 5;  // duty cicle based on the coil PWM, in 0-254*Vin
 const float Kp=0.8;      // Kp used in the closed loop speed system
 const float Ki=0.25;      // Ki used in the closed loop speed system
 const uint16_t MaxSpeed = 188; // max steep --> min millis per quarter rev 47 millis/quarte rev = 320RPM
-uint8_t Dty = 125, LastDty = 0;           // starting duty cicle
+uint8_t Dty = 125;           // starting duty cicle
 uint8_t counter = 0, countMax = 2;
 int LastErr=0;
 uint8_t MaxSpeedCount=0;
@@ -111,6 +111,20 @@ bool PowerState(){
    #endif
 } 
 
+void CheckStatus(){
+  //debugln("--- Checking internal stats ---");
+  #if MODE != 3 
+  bool PrivateAux=PowerState();
+  CheckTemp();
+  if((digitalRead(PIDErr) && HeaterState) || digitalRead(WaterLevel)){
+    debugln("#### HEATER ERROR ####");
+    debugln("Turning OFF water heater :(");
+    digitalWrite(Heater, LOW);
+    err1();
+  }
+  #endif
+}
+
 int Aturn(){
   debugln(">>>> Aturn");
   Ti=millis();
@@ -118,7 +132,7 @@ int Aturn(){
   
     digitalWrite(C1, HIGH);
     delayMicroseconds(5000);
-    while(!digitalRead(ind1)){
+    while(!digitalRead(ind1)){ //MISSING ANOTHER CONDITION!!!!
    
     }
     digitalWrite(C1, LOW);
@@ -144,6 +158,7 @@ int Aturn(){
       
     }
     digitalWrite(C4, LOW);
+    Tf=millis();
 
     debug("Time: ");
     debugln(Tf-Ti);
@@ -238,17 +253,10 @@ int CheckPosition(){
 }
 
 void CanPask(int value){
-  if(value == -1){
-    digitalWrite(Update,HIGH);
-    delayMicroseconds(2500);
-  }
-  else if(value != LastDty){
   analogWrite(PWMOut, value);
-  digitalWrite(Update, LOW);
-  delayMicroseconds(1000);
-  LastDty = value;
-  digitalWrite(Update, HIGH);
-  }
+  debugln("CanPaskiiiiiii:");
+  Serial.write(int(char(value)));
+  Serial.println();
 }
 
 void CheckTemp(){
@@ -335,7 +343,7 @@ void GoToStart(){
   goes to a known position to start in a known direction
   */
   //debugln("--- GOING TO START POSITION ---");
-  CanPask(-1); //Starting CanPask
+
   digitalWrite(SoftStart, HIGH);
   CanPask(Dty);
   switch (CheckPosition()){
@@ -363,7 +371,6 @@ void GoToStart(){
 }
 
 
-
 uint8_t GetDty(int Pv){
   debugln("--- SPEED PI Control ---");
   //ToRpm(Pv);
@@ -372,65 +379,61 @@ uint8_t GetDty(int Pv){
       counter --;
       debug("PID: ");
       debugln(MaxDty);
-      CanPask(MaxDty);
+      analogWrite(PWMOut, MaxDty);
+      return(MaxDty);
       
     }
     else{
       counter --;
       debug("PID: ");
-      debugln(5);
-      CanPask(5);
+      debugln(MinDty);
+      analogWrite(PWMOut, MinDty);
+      return(MinDty);
     }
   }
   
-  else if(MaxSpeed > Pv && MaxSpeedCount>=5){
+  
+  else if(MaxSpeed > Pv && MaxSpeedCount>=100){
     debugln("#### OVERSPEED DETECTED ####");   
     err2();
   }
   else if(MaxSpeed > Pv){
     MaxSpeedCount ++;
     debug("PID: ");
-    debug(5);
-    CanPask(5);
+    debug(MinDty);
+    analogWrite(PWMOut, MinDty);
+    
   }
-   
-  int E, Sp=SetSpeed();
-  
-  E=int((Pv - Sp)*Kp +LastErr*Ki);
-  debug("Error: ");
-  debugln(E);
-  LastErr=E;
-  if(E>MaxDty){
-    debug("PID: ");
-    debugln(MaxDty);
-    counter=0;
-    CanPask(MaxDty);
-  }
-  else if(E<5){
-    debug("PID: ");
-    debugln(5);
-    counter=0;
-    CanPask(5);
-  }
-  counter=0;
-  debug("PID: ");
-  debug(E);
-  CanPask(E);
- 
-}
+  else{
 
-void CheckStatus(){
-  //debugln("--- Checking internal stats ---");
-  #if MODE != 3 
-  bool PrivateAux=PowerState();
-  CheckTemp();
-  if((digitalRead(PIDErr) && HeaterState) || digitalRead(WaterLevel)){
-    debugln("#### HEATER ERROR ####");
-    debugln("Turning OFF water heater :(");
-    digitalWrite(Heater, LOW);
-    err1();
-  }
-  #endif
+        int E, Sp=SetSpeed();
+    
+      E=int((Pv - Sp)*Kp +LastErr*Ki);
+        debug("Error: ");
+        debugln(E);
+        LastErr=E;
+        if(E>MaxDty){
+          debug("PID: ");
+          debugln(MaxDty);
+          counter=0;
+          analogWrite(PWMOut, MaxDty);
+          return(MaxDty);
+        }
+        else if(E<MinDty){
+          debug("PID: ");
+          debugln(MinDty);
+          counter=0;
+          analogWrite(PWMOut, MinDty);
+          return(MinDty);
+        }
+        else{
+        counter=0;
+        debug("PID: ");
+        debug(E);
+        analogWrite(PWMOut, E);
+        return(E);
+      }
+   }
 }
 
 
@@ -443,7 +446,7 @@ void Run(){
 
       }
   else{
-        GetDty(Aturn());
+        CanPask(GetDty(Aturn()));
         }     
     counter++;
   
@@ -469,8 +472,18 @@ void setup(){
   digitalWrite(Led, HIGH);
   digitalWrite(SoftStart, HIGH);
   
-  
-        
+  /*for(;;){
+    digitalWrite(Led, HIGH);
+    digitalWrite(Heater, HIGH);
+    digitalWrite(SoftStart, HIGH);
+    delay(1000);
+    digitalWrite(Led, LOW);
+    digitalWrite(Heater, LOW);
+    digitalWrite(SoftStart, LOW);
+    delay(1000);
+    
+  }
+    */    
         
   delay(500);
   digitalWrite(Led, LOW);
