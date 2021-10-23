@@ -33,6 +33,7 @@
 // GPIO's
 #define SPspeed   A0   // analog value k to the Set point for the speed
 #define CTemp     A1     // analog value k to the temp of the coil
+#define ModulatorErr A2 // Sever modulator error W CanPask
 #define WaterLevel A3  // Water level digital sensor
 #define PIDErr    A4     // Temp controller error + Err for CanPask Comunication
 #define ind1      A5    // DigIn for the absolute position encoder
