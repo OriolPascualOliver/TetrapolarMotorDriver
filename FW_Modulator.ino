@@ -16,11 +16,14 @@
 #define PWM         3
 #define Data A0
 #define DtyMin 5
-#define DtyMax 100
+#define DtyMax 200
 
 
 uint32_t freq = 16000;
 uint32_t MinPeriod = 10; //max speed period in ms
+int counter=0;
+int CountMax=100;
+
 int Dty;
 
 /*int GetPulse(){
@@ -59,11 +62,12 @@ void setup(){
     
 }
 void loop(){
-    if(!digitalRead(Update)){
+    if(digitalRead(Update) || counter >=CountMax){
         Dty=map(analogRead(Data), 0, 1023, DtyMin, DtyMax);
+        counter=0;
               
     }
  pwmWrite(PWM, Dty);
-
+counter++;
 
 }
