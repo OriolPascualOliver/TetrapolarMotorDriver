@@ -58,11 +58,11 @@
 
 // System Var's
 const unsigned long OnDelayPulse = 1500; //ms to wait pulsed to start the secuence
-const uint16_t = 250, MinDty = 5;  // duty cicle based on the coil PWM, in 0-254*Vin
+const uint16_t MaxDty = 200, MinDty = 5;  // duty cicle based on the coil PWM, in 0-254*Vin
 const float Kp=0.8;      // Kp used in the closed loop speed system
-const float Ki=0.25;      // Ki used in the closed loop speed system
+const float Ki=0.1;      // Ki used in the closed loop speed system
 const uint16_t MaxSpeed = 188; // max steep --> min millis per quarter rev 47 millis/quarte rev = 320RPM
-uint8_t Dty = 150;           // starting duty cicle
+uint8_t Dty = 170;           // starting duty cicle
 uint8_t counter = 0, countMax = 2;
 int LastErr=0;
 uint8_t MaxSpeedCount=0;
@@ -203,6 +203,12 @@ void step4(){
 
     }
     digitalWrite(C4, LOW);
+}
+void multipleSteps(int coil){
+  if(coil == 1){
+    
+  }
+  
 }
 
 
@@ -454,7 +460,6 @@ void Run(){
 void setup(){
   pinMode(CTemp, INPUT);
   pinMode(SPspeed, INPUT);
-  pinMode(CSens, INPUT);
   pinMode(ind1, INPUT);
   pinMode(ind2, INPUT);
   pinMode(ind3, INPUT);
@@ -512,3 +517,4 @@ void loop(){
       delay(5);
     }
 }
+
