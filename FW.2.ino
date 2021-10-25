@@ -417,11 +417,11 @@ uint8_t GetDty(int Pv){
       E=int((Pv - Sp)*Kp +LastErr*Ki);
         debug("Error: ");
         debugln(E);
-        LastErr=E;
         if(E>MaxDty){
           debug("PID: ");
           debugln(MaxDty);
           counter=0;
+          LastErr=MaxDty;
           analogWrite(PWMOut, MaxDty);
           return(MaxDty);
         }
@@ -429,6 +429,7 @@ uint8_t GetDty(int Pv){
           debug("PID: ");
           debugln(MinDty);
           counter=0;
+          LastErr=MinDty;
           analogWrite(PWMOut, MinDty);
           return(MinDty);
         }
@@ -436,6 +437,7 @@ uint8_t GetDty(int Pv){
         counter=0;
         debug("PID: ");
         debug(E);
+        LastErr=E;
         analogWrite(PWMOut, E);
         return(E);
       }
@@ -517,4 +519,3 @@ void loop(){
       delay(5);
     }
 }
-
