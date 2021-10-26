@@ -213,10 +213,33 @@ void step4(){
     }
     digitalWrite(C4, LOW);
 }
-void multipleSteps(int coil){
-  if(coil == 1){
-    
-  }
+void Bstep(int num, int wait){
+  switch (num){
+    case 1:
+      Ti=millis();
+      digitalWrite(C1, HIGH);
+      while(!digitalRead(ind1) && (Ti -millis()) < wait){
+      delayMicroseconds(100);  
+      }
+      digitalWrite(C1, LOW);
+      Ti=millis();
+      digitalWrite(C4, HIGH);
+      while(digitalRead(ind1) || digitalRead(ind2)){
+      delayMicroseconds(100);  
+      if(Ti-millis() > wait){
+        err1();
+      }
+      }
+      digitalWrite(C4, LOW);
+      step1();
+
+      break
+
+    case 2:
+      step2();
+      step3();
+      step4();
+      step1(); 
   
 }
 
@@ -356,6 +379,8 @@ void GoToStart(){
   //debugln("--- GOING TO START POSITION ---");
 
   analogWrite(PWMOut, Dty);
+  Bstep(CheckPosition());
+  /*
   switch (CheckPosition()){
 
     case 1:
@@ -377,6 +402,7 @@ void GoToStart(){
       step1();
       break;
   }
+  */
 
 }
 
