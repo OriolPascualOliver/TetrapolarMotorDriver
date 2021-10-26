@@ -4,6 +4,7 @@
 * Date:   07-JUL-21                                *
 * rev:    3.5, Release: 21/10/2021, Stat: STABLE   *
 ****************************************************/
+//version w a proper pid control
 
 /*************************************************** 
 *                  --DEBUGGING-- 
@@ -30,6 +31,9 @@
 #define debugln(x)
 #endif
 
+#include <PID_v1.h>
+//https://github.com/br3ttb/Arduino-PID-Library
+
 // GPIO's
 #define SPspeed   A0   // analog value k to the Set point for the speed
 #define CTemp     A1     // analog value k to the temp of the coil
@@ -52,27 +56,32 @@
 #define C1        10      // Coil outputs
 #define MP        11 
 #define Buzz      12    // UI
-#define SoftStart 13   // Relay to short a high power R seried to the cap to create a soft start for the first seconds
+
         
 
 
 // System Var's
 const unsigned long OnDelayPulse = 1500; //ms to wait pulsed to start the secuence
-const uint16_t MaxDty = 200, MinDty = 5;  // duty cicle based on the coil PWM, in 0-254*Vin
-const float Kp=0.8;      // Kp used in the closed loop speed system
-const float Ki=0.1;      // Ki used in the closed loop speed system
-const uint16_t MaxSpeed = 188; // max steep --> min millis per quarter rev 47 millis/quarte rev = 320RPM
-uint8_t Dty = 170;           // starting duty cicle
+const double MaxDty = 200, MinDty = 5;  // duty cicle based on the coil PWM, in 0-254*Vin
+const uint16_t MaxSpeed = 47; // max steep --> min millis per quarter rev 47 millis/quarte rev = 320RPM
+double Dty = 170;           // starting duty cicle
 uint8_t counter = 0, countMax = 2;
-int LastErr=0;
 uint8_t MaxSpeedCount=0;
 bool ON = false;
 const uint16_t Tmax = 700;  // max temp, value from 0 to 1024
 const int speeds[10] = {75, 71, 68, 65, 63, 60, 58, 56, 54, 52}; //speed in millis per quarter of rev [ms]
-uint8_t Spd_multiplier = 4;
+double Spd_multiplier = 4.0;
 unsigned long Ti, Tf, aux; 
 bool HeaterState = false;
 bool RotorState = false;
+
+
+
+//PID SHIT
+double Kp=2, Ki=5, Kd=1;
+double PidSp, PidPv, E;
+PID myPID(&PidPv, &E, &PidSp, Kp, Ki, Kd, P_ON_M, REVERSE);
+
 
 /*
 TCCR1 = 0xB2;
@@ -222,7 +231,7 @@ void HeaterEnable(){
  }
 
  
-int SetSpeed(){
+double SetSpeed(){
   /*
   Reads the SetPSpeed and outputs a mills/rev value
   OUTPUT INT
@@ -258,12 +267,6 @@ int CheckPosition(){
   }
 }
 
-void CanPask(int value){
-  analogWrite(PWMOut, value);
-  debugln("CanPaskiiiiiii:");
-  Serial.write(int(char(value)));
-  Serial.println();
-}
 
 void CheckTemp(){
   /*
@@ -283,6 +286,7 @@ void err1(){
   overheated coil error
   */
   debugln("### ENTERING ERROR1 MODE ### :(");
+  analogWrite(PWMOut, MinDty);
   digitalWrite(C1, LOW);
   digitalWrite(C2, LOW);
   digitalWrite(C3, LOW);
@@ -315,6 +319,7 @@ void err2(){
   rotor problem
   */
   debugln("### ENTERING ERROR2 MODE ### :(");
+  analogWrite(PWMOut, MinDty);
   digitalWrite(C1, LOW);
   digitalWrite(C2, LOW);
   digitalWrite(C3, LOW);
@@ -350,8 +355,7 @@ void GoToStart(){
   */
   //debugln("--- GOING TO START POSITION ---");
 
-  digitalWrite(SoftStart, HIGH);
-  CanPask(Dty);
+  analogWrite(PWMOut, Dty);
   switch (CheckPosition()){
 
     case 1:
@@ -381,25 +385,13 @@ uint8_t GetDty(int Pv){
   debugln("--- SPEED PI Control ---");
   //ToRpm(Pv);
   if(Pv == 0 || Pv == 1){
-    if(LastErr>MaxDty){
       counter --;
-      debug("PID: ");
-      debugln(MaxDty);
-      analogWrite(PWMOut, MaxDty);
-      return(MaxDty);
-      
-    }
-    else{
-      counter --;
-      debug("PID: ");
-      debugln(MinDty);
       analogWrite(PWMOut, MinDty);
       return(MinDty);
-    }
   }
   
   
-  else if(MaxSpeed > Pv && MaxSpeedCount>=100){
+  else if(MaxSpeed > Pv && MaxSpeedCount>=5){
     debugln("#### OVERSPEED DETECTED ####");   
     err2();
   }
@@ -412,16 +404,15 @@ uint8_t GetDty(int Pv){
   }
   else{
 
-        int E, Sp=SetSpeed();
-    
-      E=int((Pv - Sp)*Kp +LastErr*Ki);
+        PidSp=SetSpeed();
+        myPID.Compute();
+ 
         debug("Error: ");
         debugln(E);
         if(E>MaxDty){
           debug("PID: ");
           debugln(MaxDty);
           counter=0;
-          LastErr=MaxDty;
           analogWrite(PWMOut, MaxDty);
           return(MaxDty);
         }
@@ -429,7 +420,6 @@ uint8_t GetDty(int Pv){
           debug("PID: ");
           debugln(MinDty);
           counter=0;
-          LastErr=MinDty;
           analogWrite(PWMOut, MinDty);
           return(MinDty);
         }
@@ -437,7 +427,6 @@ uint8_t GetDty(int Pv){
         counter=0;
         debug("PID: ");
         debug(E);
-        LastErr=E;
         analogWrite(PWMOut, E);
         return(E);
       }
@@ -454,7 +443,7 @@ void Run(){
 
       }
   else{
-        CanPask(GetDty(Aturn()));
+        GetDty(Aturn());
         }     
     counter++;
   
@@ -477,7 +466,7 @@ void setup(){
   pinMode(Update, OUTPUT);
   digitalWrite(PWMOut, OUTPUT);
   digitalWrite(Led, HIGH);
-  digitalWrite(SoftStart, HIGH);
+  myPID.SetMode(AUTOMATIC);
   
   /*for(;;){
     digitalWrite(Led, HIGH);
